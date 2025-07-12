@@ -12,6 +12,7 @@
 #include "load_function.cpp"
 #include "fem_funcs.cpp"
 #include "gauss.cpp"
+#include "write_to_vtu.cpp"
 
 void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool print_C = 0, bool print_P=0){
     std::string file = "../" + file_name;
@@ -93,9 +94,11 @@ void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool pr
         }
 
         t = Gauss(Global, t);
-        std::cout<<"Temperature at time " << i << "s:\n";
+        std::cout<<"\nTemperature at time " << i << "s:";
 
         std::cout << "\nMIN: " << *std::min_element(t.begin(), t.end()) << " MAX: " << *std::max_element(t.begin(), t.end()) << std::endl;
+        
+        write_to_vtu_file((int)i, nodes, t, elements);
 
         t0=t;
     }
