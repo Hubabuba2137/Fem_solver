@@ -1,5 +1,5 @@
-SimulationTime 500
-SimulationStepTime 50
+SimulationTime 100
+SimulationStepTime 10
 Conductivity 25
 Alfa 300
 Tot 1200

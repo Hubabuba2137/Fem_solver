@@ -93,7 +93,6 @@ Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes
         int id2 = local_el.node_ids[(i+1)%3]-1;
         
         if (!(nodes[id1].bc || nodes[id2].bc)) continue;
-        //if (!is_boundary_edge(id1+1, id2+1, elements)) continue;
 
         double det_J = 0.5*dist(nodes[id1], nodes[id2]);
         Fem::Matrix hbc_i(3,3);
@@ -143,7 +142,6 @@ Fem::Matrix calc_p_vec(Fem::Element &local_el, std::vector<Fem::Node> &nodes, fl
         int id2 = local_el.node_ids[(i+1)%3]-1;
         
         if (!(nodes[id1].bc || nodes[id2].bc)) continue;
-        //if (!is_boundary_edge(id1+1, id2+1, elements)) continue;
 
         double det_J = 0.5*dist(nodes[id1], nodes[id2]);
         Fem::Matrix p_i(3,1);

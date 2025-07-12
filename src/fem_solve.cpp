@@ -14,7 +14,7 @@
 #include "gauss.cpp"
 #include "write_to_vtu.cpp"
 
-void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool print_C = 0, bool print_P=0){
+void solve(std::string file_name, bool write_vtu=0, bool print_conf = 1, bool print_H = 0, bool print_C = 0, bool print_P=0){
     std::string file = "../" + file_name;
 
     std::vector<Fem::Node> nodes = load_nodes(file);
@@ -98,7 +98,9 @@ void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool pr
 
         std::cout << "\nMIN: " << *std::min_element(t.begin(), t.end()) << " MAX: " << *std::max_element(t.begin(), t.end()) << std::endl;
         
-        write_to_vtu_file((int)i, nodes, t, elements);
+        if(write_vtu){
+            write_to_vtu_file((int)i, nodes, t, elements);
+        }
 
         t0=t;
     }
