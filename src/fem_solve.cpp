@@ -33,9 +33,10 @@ void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool pr
     
     for(int i =0; i<configuration.elem_number;i++){ //pętla po elementach
         elements[i].H_local = calc_local_H(elements[i], ref_el, nodes, configuration.conductivity); // macierz H lokalna
-        elements[i].H_bc = calc_local_Hbc(elements[i], nodes, configuration.alfa); //lokalna macierz Hbc
+        elements[i].H_bc = calc_local_Hbc(elements[i], nodes, configuration.alfa, elements); //lokalna macierz Hbc
+
         elements[i].H_local = elements[i].H_local+elements[i].H_bc; //sumowanie lokalnej H i Hbc
-        elements[i].P = calc_p_vec(elements[i], nodes, configuration.alfa, configuration.tot);
+        elements[i].P = calc_p_vec(elements[i], nodes, configuration.alfa, configuration.tot, elements);
         elements[i].C = calc_c(elements[i], ref_el, nodes, configuration.density, configuration.specific_heat);
 
         //aggregate(H_glob, elements[i], elements[i].H_local);
@@ -43,7 +44,7 @@ void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool pr
         //aggregate_p_vec(P_glob, elements[i], elements[i].P);
     }
     std::cout<<"Local matrices and vectors constructed\n";
-    
+
     for(int i =0; i<configuration.elem_number;i++){
         aggregate(H_glob, elements[i], elements[i].H_local);
         aggregate(C_glob, elements[i], elements[i].C);
@@ -93,11 +94,6 @@ void solve(std::string file_name, bool print_conf = 1, bool print_H = 0, bool pr
 
         t = Gauss(Global, t);
         std::cout<<"Temperature at time " << i << "s:\n";
-        
-        /*
-        for(size_t a=0; a<t.size(); a++){
-            std::cout<<"Temperature in node "<<a<<" = "<<t[a]<<", ";
-        }*/
 
         std::cout << "\nMIN: " << *std::min_element(t.begin(), t.end()) << " MAX: " << *std::max_element(t.begin(), t.end()) << std::endl;
 

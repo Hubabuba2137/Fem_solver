@@ -11,19 +11,17 @@
 
 std::vector<double> pc_xi = {0.1667, 0.6667, 0.1667};
 std::vector<double> pc_eta = {0.1667, 0.1667, 0.6667};
-std::vector<double> weights_pc = {0.1667, 0.1667, 0.1667};
+std::vector<double> weights_pc = {1.0/6.0, 1.0/6.0, 1.0/6.0};
 
 std::vector<double> n1_bc_val = {0.8873, 0.5000, 0.1127, 0, 0, 0, 0.1127, 0.5000, 0.8873 };
 std::vector<double> n2_bc_val = {0.1127, 0.5000, 0.8873, 0.8873, 0.5000, 0.1127, 0, 0, 0};
 std::vector<double> n3_bc_val = {0, 0, 0, 0.1127, 0.5000, 0.8873, 0.8873, 0.5000, 0.1127,};
 
-
-std::vector<double> weights_bc = {0.2777, 0.4444, 0.2777};
+std::vector<double> weights_bc = {5.0/9.0, 8.0/9.0, 5.0/9.0};
 
 float dist(Fem::Node a, Fem::Node b){
     return sqrt(pow( a.x - b.x,2)+pow(a.y - b.y,2));
 }
-
 
 Fem::Matrix calc_jacobian_mat(Fem::Element &element, std::vector<Fem::Node> &nodes){
     Fem::Matrix jacobian(2,2);
@@ -31,10 +29,6 @@ Fem::Matrix calc_jacobian_mat(Fem::Element &element, std::vector<Fem::Node> &nod
     Fem::Node n1 = nodes[element.node_ids[0]-1];
     Fem::Node n2 = nodes[element.node_ids[1]-1];
     Fem::Node n3 = nodes[element.node_ids[2]-1];
-
-    //      |x2-x1  x3-x1|
-    // J =  |            |
-    //      |y2-y1  y3-y1|
 
     jacobian[0][0] = n2.x-n1.x;
     jacobian[0][1] = n3.x-n1.x;
@@ -55,8 +49,8 @@ Fem::Matrix inverse_jacobian_matrix(Fem::Matrix &J){
 
     inv_jac[0][0] = inv_det_J*J[1][1];
     inv_jac[1][1] = inv_det_J*J[0][0];
-    inv_jac[1][0] = -inv_det_J*J[0][1];
-    inv_jac[0][1] = -inv_det_J*J[1][0];
+    inv_jac[1][0] = -inv_det_J*J[1][0];
+    inv_jac[0][1] = -inv_det_J*J[0][1];
 
     return inv_jac;
 }
@@ -85,7 +79,7 @@ Fem::Matrix calc_local_H(Fem::Element &local_el, Fem::Ref_triangle &ref_el, std:
     return H_local;
 }
 
-Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes, float alfa){
+Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes, float alfa, std::vector<Fem::Element> &elements){
     Fem::Matrix hbc(3,3);
 
     for(int i=0; i<3; i++){//pętla po bokach
@@ -98,13 +92,10 @@ Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes
         int id1 = local_el.node_ids[i]-1;
         int id2 = local_el.node_ids[(i+1)%3]-1;
         
-        if(!nodes[id1].bc && !nodes[id2].bc){
-            continue;
-        }
+        if (!(nodes[id1].bc || nodes[id2].bc)) continue;
+        //if (!is_boundary_edge(id1+1, id2+1, elements)) continue;
 
-        //std::cout<<"\t"<<id1<<", "<<id2<<"\n"; //sprawdzenie jakie węzły są brane pod uwagę w czasie całkowania
-        //sprawdzenie czy np. nody bez warunków brzegowych nie są brane pod uwagę
-        float det_J = 0.5*dist(nodes[id1], nodes[id2]);
+        double det_J = 0.5*dist(nodes[id1], nodes[id2]);
         Fem::Matrix hbc_i(3,3);
 
         for(int j=0; j<3; j++){//pętla po pc
@@ -116,7 +107,6 @@ Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes
             h_pc[1][0] = n2_bc_val[j+k];
             h_pc[2][0] = n3_bc_val[j+k];
 
-            //std::cout<<h_pc[0][0]<<", "<<h_pc[1][0]<<", "<<h_pc[2][0]<<"\n";
             Fem::Matrix h_pc_temp(3,3);
 
             h_pc_temp = h_pc*h_pc.transpose();
@@ -125,18 +115,16 @@ Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes
             
             for(int a=0; a<3; a++){
                 for(int b=0; b<3; b++){
-                    h_pc_temp[a][b] = h_pc_temp[a][b]*weights_bc[j];
+                    h_pc_temp[a][b] *= weights_bc[j];
                 }
             }
-            //std::cout<<"h_pc *"<<weights_bc[j]<<"=\n"<<h_pc_temp<<"\n";
 
             hbc_i = hbc_i + h_pc_temp;
-            //std::cout<<hbc_i<<"\n";
         }
         
         for(int i=0; i<3; i++){
             for(int j=0; j<3; j++){
-                hbc_i[i][j] = hbc_i[i][j]*det_J*alfa;
+                hbc_i[i][j] *= det_J*alfa;
             }
         }
 
@@ -147,18 +135,17 @@ Fem::Matrix calc_local_Hbc(Fem::Element &local_el, std::vector<Fem::Node> &nodes
     return hbc;
 }
 
-Fem::Matrix calc_p_vec(Fem::Element &local_el, std::vector<Fem::Node> &nodes, float alfa, float T_ext){
+Fem::Matrix calc_p_vec(Fem::Element &local_el, std::vector<Fem::Node> &nodes, float alfa, float T_ext, std::vector<Fem::Element> &elements){
     Fem::Matrix p_vec(3,1);
 
     for(int i =0; i<3; i++){
         int id1 = local_el.node_ids[i]-1;
         int id2 = local_el.node_ids[(i+1)%3]-1;
         
-        if(!nodes[id1].bc && !nodes[id2].bc){
-            continue;
-        }
+        if (!(nodes[id1].bc || nodes[id2].bc)) continue;
+        //if (!is_boundary_edge(id1+1, id2+1, elements)) continue;
 
-        float det_J = 0.5*dist(nodes[id1], nodes[id2]);
+        double det_J = 0.5*dist(nodes[id1], nodes[id2]);
         Fem::Matrix p_i(3,1);
 
         for(int j=0; j<3;j++){//pętla po pc na jednym boku
@@ -178,7 +165,7 @@ Fem::Matrix calc_p_vec(Fem::Element &local_el, std::vector<Fem::Node> &nodes, fl
         }
         
         for(int i=0; i<3; i++){
-            p_i[i][0] = p_i[i][0]*alfa*det_J;
+            p_i[i][0] *= alfa*det_J;
         }
         //std::cout<<p_i<<"\n";
         
@@ -188,7 +175,7 @@ Fem::Matrix calc_p_vec(Fem::Element &local_el, std::vector<Fem::Node> &nodes, fl
     return p_vec;
 }
 
-Fem::Matrix calc_c(Fem::Element &local_el, Fem::Ref_triangle ref_el, std::vector<Fem::Node> &nodes, float density, float conductivity){
+Fem::Matrix calc_c(Fem::Element &local_el, Fem::Ref_triangle ref_el, std::vector<Fem::Node> &nodes, float density, float specific_heat){
     Fem::Matrix c_mat(3,3);
     Fem::Matrix el_jac = calc_jacobian_mat(local_el, nodes);
     float det_J = calc_jacobian(el_jac);
@@ -204,9 +191,11 @@ Fem::Matrix calc_c(Fem::Element &local_el, Fem::Ref_triangle ref_el, std::vector
         Fem::Matrix c_temp = c_i*c_i.transpose();
         //std::cout<<"Before\n"<<c_temp<<"\n";
 
+        double A = 0.5*std::fabs(det_J);
+
         for(int j=0; j<3; j++){
             for(int k=0; k<3; k++){
-                c_temp[j][k] *= weights_pc[i]*std::fabs(det_J)*density*conductivity;
+                c_temp[j][k] *= weights_pc[i]*A*density*specific_heat;
             }
         }
         //std::cout<<"After\n"<<c_temp<<"\n";
